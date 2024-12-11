@@ -1,2 +1,102 @@
+#include <Mouse.h>
 
-hi
+// Set pin numbers for joystick axes and LED:
+const int xAxis = A0;       // Joystick X axis
+const int yAxis = A1;       // Joystick Y axis
+const int ledPin = 4;       // Mouse control LED
+
+// Parameters for reading the joystick:
+float maxSpeed = 3.0;        // Maximum output range of X or Y movement (slower, more precise movement)
+float responseDelay = 2.0;   // Response delay of the mouse, in ms
+float threshold = 5.0;       // Resting threshold value to stop movement when near center (small dead zone)
+float center = 512.0;        // The resting center position value (joystick is usually 512 at rest)
+float accelerationFactor = 0.1;  // Controls how gradually the speed increases as joystick moves
+
+void setup() {
+  // Setup pins
+  pinMode(ledPin, OUTPUT);
+  pinMode(5, OUTPUT);
+  pinMode(6, INPUT_PULLUP);
+  pinMode(8, INPUT_PULLUP);
+
+  // Start Serial for debugging
+  Serial.begin(9600);
+  Mouse.begin();
+}
+
+void loop() {
+  // Left Click
+  if (digitalRead(8) == LOW) {
+    Mouse.press(MOUSE_LEFT);
+    delay(200);
+    while (Mouse.isPressed(MOUSE_LEFT)) {
+      // Read and scale the two axes:
+      int xReading = readAxis(xAxis);
+      int yReading = readAxis(yAxis);
+
+      // Move the mouse based on joystick position:
+      Mouse.move(xReading, yReading, 0);
+
+      delay(responseDelay);
+      if (digitalRead(8) == HIGH) {
+        Mouse.release(MOUSE_LEFT);
+        delay(200);
+      }
+    }
+  }
+
+  // Right Click
+  if (digitalRead(7) == LOW) {
+    Mouse.press(MOUSE_RIGHT);
+    delay(200);
+    while (Mouse.isPressed(MOUSE_RIGHT)) {
+      // Read and scale the two axes:
+      int xReading = readAxis(xAxis);
+      int yReading = readAxis(yAxis);
+
+      // Move the mouse based on joystick position:
+      Mouse.move(xReading, yReading, 0);
+
+      delay(responseDelay);
+      if (digitalRead(7) == HIGH) {
+        Mouse.release(MOUSE_RIGHT);
+      }
+    }
+  }
+
+  // Joystick Movement Code and LED control for the light
+  digitalWrite(ledPin, HIGH);
+  digitalWrite(5, HIGH);
+
+  // Read and scale the two axes:
+  int xReading = readAxis(xAxis);
+  int yReading = readAxis(yAxis);
+
+  // Move the mouse smoothly:
+  Mouse.move(xReading, yReading, 0);
+
+  delay(responseDelay);
+}
+
+// Function to read joystick axis and scale the movement gradually
+int readAxis(int thisAxis) {
+  // Read the analog input:
+  int reading = analogRead(thisAxis);
+
+  // Calculate the distance from the center (resting position):
+  float distance = reading - center;
+
+  // If the joystick is within the threshold (dead zone), don't move the mouse:
+  if (abs(distance) < threshold) {
+    return 0;
+  }
+
+  // Normalize the distance to a range between -1 and 1:
+  float normalizedDistance = distance / (1023.0 - center);
+
+  // Apply a softer exponential curve to gradually accelerate the movement:
+  float scaledSpeed = maxSpeed * pow(abs(normalizedDistance), 3) * (normalizedDistance > 0 ? 1 : -1);
+
+  // Return the scaled speed (smooth acceleration):
+  return (int)scaledSpeed;
+}
